@@ -1,6 +1,8 @@
 <?php
 session_start();
 
+// this is a comment
+
 require_once '../conn/conn.php'; // ملف الاتصال بقاعدة البيانات
 require_once 'admin_event_user.php'; // ملف الفئات اللازمة
 
