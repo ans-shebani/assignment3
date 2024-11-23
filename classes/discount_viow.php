@@ -1,7 +1,7 @@
 <?php
 // session_start();
 include '../conn/conn.php';
-require_once 'Discount.php';
+require_once 'discount.php';
 
 // if (!isset($_SESSION['admin_id'])) {
 //     header('Location: login.php');
