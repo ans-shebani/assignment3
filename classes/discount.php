@@ -1,66 +1,92 @@
 <?php
-// تعريف فئة الخصم
+include '../conn/conn.php';
 class Discount {
-    private $db;         // متغير لتخزين كائن قاعدة البيانات
-    private $userType;   // نوع المستخدم (مثل طالب، عسكري، معلم، كبار السن)
-    private $price;      // السعر الأساسي قبل تطبيق الخصم
+    private $db;
+    private $userType;
+    private $price;
+    private $ticketType; // إضافة نوع التذكرة (عادي/VIP)
+    private $seasonalDiscount; // خصم موسمي إضافي
     
-    // دالة البناء: تهيئة المتغيرات عند إنشاء كائن جديد من الفئة
-    public function __construct($db, $userType, $price) {
+    // تحديث دالة البناء لتشمل المتغيرات الجديدة
+    public function __construct($db, $userType, $price, $ticketType = 'Regular', $seasonalDiscount = 0) {
         $this->db = $db;
         $this->userType = $userType;
         $this->price = $price;
+        $this->ticketType = $ticketType;
+        $this->seasonalDiscount = $seasonalDiscount;
     }
     
-    // دالة لحساب السعر بعد تطبيق الخصم
-    public function calculateDiscount() {
-        // استعلام للحصول على معدل الخصم من قاعدة البيانات بناءً على نوع المستخدم
-        $query = "SELECT discountRate FROM Discounts WHERE category = ?";
-        $stmt = $this->db->prepare($query);
-        $stmt->execute([$this->userType]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($result) {
-            // تحويل معدل الخصم من نسبة مئوية إلى عدد عشري
-            $discountRate = $result['discountRate'] / 100; 
-        } else {
-            // معدلات خصم افتراضية إذا لم يتم العثور على النوع في قاعدة البيانات
-            $discountRates = [
-                'student' => 0.20,       // 20% خصم للطلاب
-                'military' => 0.30,      // 30% خصم للعسكريين
-                'teacher' => 0.15,       // 15% خصم للمعلمين
-                'the_elderly' => 0.25    // 25% خصم لكبار السن
-            ];
-            // التحقق من وجود معدل خصم افتراضي لنوع المستخدم المحدد
-            $discountRate = isset($discountRates[$this->userType]) ? $discountRates[$this->userType] : 0;
+    // دالة للتحقق من صلاحية نوع المستخدم
+    private function isValidUserType($userType) {
+        $validTypes = ['student', 'military', 'teacher', 'the_elderly'];
+        return in_array($userType, $validTypes);
+    }
+    
+    // دالة لتطبيق خصم إضافي للتذاكر VIP
+    private function applyVIPDiscount($price) {
+        if ($this->ticketType === 'VIP') {
+            return $price * 0.95; // خصم إضافي 5% على تذاكر VIP
+        }
+        return $price;
+    }
+    
+    // دالة محدثة لحساب السعر النهائي مع جميع الخصومات
+    public function calculateFinalPrice() {
+        if (!$this->isValidUserType($this->userType)) {
+            throw new Exception("نوع المستخدم غير صالح");
         }
         
-        // حساب السعر بعد تطبيق الخصم
-        return $this->price * (1 - $discountRate);
+        $baseDiscount = $this->calculateDiscount();
+        $priceAfterBaseDiscount = $this->price * (1 - $baseDiscount);
+        $priceAfterVIP = $this->applyVIPDiscount($priceAfterBaseDiscount);
+        $finalPrice = $priceAfterVIP * (1 - ($this->seasonalDiscount / 100));
+        
+        return round($finalPrice, 2); // تقريب السعر لأقرب رقمين عشريين
     }
     
-    // دالة لاسترجاع معدل الخصم فقط
+    // دالة لعرض تفاصيل الخصم
+    public function getDiscountDetails() {
+        $baseDiscount = $this->getDiscountRate();
+        $finalPrice = $this->calculateFinalPrice();
+        $totalSaving = $this->price - $finalPrice;
+        
+        return [
+            'original_price' => $this->price,
+            'user_type' => $this->userType,
+            'base_discount_rate' => $baseDiscount,
+            'ticket_type' => $this->ticketType,
+            'seasonal_discount' => $this->seasonalDiscount,
+            'final_price' => $finalPrice,
+            'total_saving' => round($totalSaving, 2)
+        ];
+    }
+    
+    // تحديث دالة حساب الخصم الأساسي
+    private function calculateDiscount() {
+        $discountRate = $this->getDiscountRate() / 100;
+        return $discountRate;
+    }
+    
+    // باقي الدوال تبقى كما هي
     public function getDiscountRate() {
-        // استعلام لاسترجاع معدل الخصم من قاعدة البيانات
         $query = "SELECT discountRate FROM Discounts WHERE category = ?";
         $stmt = $this->db->prepare($query);
         $stmt->execute([$this->userType]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($result) {
-            return $result['discountRate'];  // إرجاع معدل الخصم من قاعدة البيانات
+            return $result['discountRate'];
         }
         
-        // معدلات خصم افتراضية إذا لم يتم العثور على النوع في قاعدة البيانات
         $discountRates = [
-            'student' => 20,       // 20% للطلاب
-            'military' => 30,      // 30% للعسكريين
-            'teacher' => 15,       // 15% للمعلمين
-            'the_elderly' => 25    // 25% لكبار السن
+            'student' => 20,
+            'military' => 30,
+            'teacher' => 15,
+            'the_elderly' => 25
         ];
         
-        // إرجاع معدل الخصم الافتراضي إذا لم يتم العثور عليه في قاعدة البيانات
         return isset($discountRates[$this->userType]) ? $discountRates[$this->userType] : 0;
     }
 }
+
 ?>
