@@ -1,6 +1,6 @@
 <?php
 // session_start();
-include '../conn/conn.php';
+include_once '../conn/conn.php';
 require_once 'discount.php';
 
 // if (!isset($_SESSION['admin_id'])) {
