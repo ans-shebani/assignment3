@@ -1,8 +1,6 @@
 <?php
 session_start();
 
-// this is a comment
-
 require_once '../conn/conn.php'; // ملف الاتصال بقاعدة البيانات
 require_once 'admin_event_user.php'; // ملف الفئات اللازمة
 
@@ -205,9 +203,9 @@ $totalEvents = count($events);
                 <li><a href="admin_dashboard.php">لوحة التحكم</a></li>
                 <li><a href="manager_event.php">إدارة الفعاليات</a></li>
                 <li><a href="#users">إدارة المستخدمين</a></li>
-                <li><a href="Notification.php">الإشعارات</a></li>
+                <li><a href="admin_notifications.php">الإشعارات</a></li>
                 <li><a href="discounts.php">الخصومات</a></li>
-                <li><a href="logout.php">تسجيل خروج</a></li>
+                <li><a href="../auth/logout.php">تسجيل خروج</a></li>
             </ul>
         </nav>
 
