@@ -76,6 +76,7 @@ $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <li><a href="event_user.php">الفعاليات</a></li>
             <li><a href="ticket_user.php">التذاكر</a></li>
             <li><a href="#discount-section">الخصومات</a></li>
+            <li><a href="user_notifications.php">الاشعارات</a></li>
             <li><a href="../auth/login.php">تسجيل دخول</a></li>
             <li><a href="../auth/logout.php">تسجيل خروج</a></li>
         </ul>
