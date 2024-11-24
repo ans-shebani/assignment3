@@ -1,5 +1,5 @@
 <?php
-include '../conn/conn.php';
+
 class Discount {
     private $db;
     private $userType;
