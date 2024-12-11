@@ -117,6 +117,7 @@ include_once '../conn/conn.php';
             <li><a href="../user/ticket_user.php">التذاكر</a></li>
             <li><a href="#discount-section">الخصومات</a></li>
             <li><a href="../user/user_notifications.php">الاشعارات</a></li>
+            <li><a href="../user/receive_gifts.php">الهدايا</a></li>
             <li><a href="../auth/login.php">تسجيل دخول</a></li>
             <li><a href="../auth/logout.php">تسجيل خروج</a></li>
         </ul>

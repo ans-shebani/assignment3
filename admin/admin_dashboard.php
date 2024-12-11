@@ -6,7 +6,7 @@ require_once 'admin_event_user.php'; // ملف الفئات اللازمة
 
 // التحقق من تسجيل الدخول
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
+    header("Location:../auth/login.php");
     exit();
 }
 
