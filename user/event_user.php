@@ -1,10 +1,14 @@
 <?php
 
 // تضمين ملف الاتصال بقاعدة البيانات
+include "../classes/favorites.php";
+
 include_once '../conn/conn.php';
 include_once '../classes/review.php';
+
 // فئة Event
 class Event {
+    
     private $conn;
     private $table_name = "Events";
 
@@ -193,7 +197,63 @@ if (isset($_POST['updateReview']) && isset($_POST['reviewID'])) {
     <title>الفعاليات</title>
     <link rel="stylesheet" href="../public/assets/style.css">
     <style>
-        .search-form {
+        .review {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .review-actions {
+            margin-top: 10px;
+        }
+
+        .btn-edit, .btn-delete, .btn-update, .btn-cancel {
+            padding: 5px 10px;
+            margin-right: 5px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .btn-edit {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .btn-delete {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .btn-update {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .btn-cancel {
+            background-color: #607D8B;
+            color: white;
+        }
+
+        .edit-form {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .edit-form textarea {
+            width: 100%;
+            margin: 10px 0;
+            padding: 5px;
+        }
+
+        .edit-form select {
+            margin: 10px 0;
+            padding: 5px;
+        }
+            .search-form {
             margin: 20px auto;
             text-align: center;
             max-width: 500px;
@@ -301,7 +361,52 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     } else {
         echo "<p class='availability'>عذرًا، لا توجد مقاعد متاحة.</p>";
     }
-    
+        
+// التحقق من أن المستخدم قد سجل دخوله
+if (isset($_SESSION['user_id'])) {
+    $userID = $_SESSION['user_id'];
+    $favorite = new Favorites($db, $userID); // إنشاء كائن من الكلاس
+
+    // معالجة إضافة الفعالية إلى المفضلة
+    if (isset($_POST['addFavorite'])) {
+        $eventID = $_POST['eventID'];
+        $favorite->addFavorite($eventID);
+    }
+
+    // معالجة إزالة الفعالية من المفضلة
+    if (isset($_POST['removeFavorite'])) {
+        $eventID = $_POST['eventID'];
+        $favorite->removeFavorite($eventID);
+    }
+
+    // التحقق إذا كان الحدث موجود في المفضلة
+    $isFavorite = false;
+    foreach ($favorite->favoriteEvents as $favoriteEvent) {
+        if ($favoriteEvent['eventID'] == $row['eventID']) {
+            $isFavorite = true;
+            break;
+        }
+    }
+
+    // عرض زر إضافة/إزالة من المفضلة
+    if ($isFavorite) {
+        echo "<form method='POST' action=''>
+                <input type='hidden' name='eventID' value='" . $row['eventID'] . "'>
+                <button type='submit' name='removeFavorite' class='btn-remove'>إزالة من المفضلة</button>
+              </form>";
+    } else {
+        echo "<form method='POST' action=''>
+                <input type='hidden' name='eventID' value='" . $row['eventID'] . "'>
+                <button type='submit' name='addFavorite' class='btn-add'>إضافة إلى المفضلة</button>
+              </form>";
+    }
+
+  
+} else {
+    echo "يرجى تسجيل الدخول أولاً.";
+}
+
+
     $review = new Review($db);
     // جلب المراجعات الخاصة بالحدث
     $reviews = $review->getReviewStats($row['eventID']);
@@ -382,64 +487,6 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
 }
 ?>
 
-<style>
-.review {
-    border: 1px solid #ddd;
-    padding: 15px;
-    margin: 10px 0;
-    border-radius: 5px;
-}
-
-.review-actions {
-    margin-top: 10px;
-}
-
-.btn-edit, .btn-delete, .btn-update, .btn-cancel {
-    padding: 5px 10px;
-    margin-right: 5px;
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-}
-
-.btn-edit {
-    background-color: #4CAF50;
-    color: white;
-}
-
-.btn-delete {
-    background-color: #f44336;
-    color: white;
-}
-
-.btn-update {
-    background-color: #2196F3;
-    color: white;
-}
-
-.btn-cancel {
-    background-color: #607D8B;
-    color: white;
-}
-
-.edit-form {
-    margin-top: 10px;
-    padding: 10px;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-}
-
-.edit-form textarea {
-    width: 100%;
-    margin: 10px 0;
-    padding: 5px;
-}
-
-.edit-form select {
-    margin: 10px 0;
-    padding: 5px;
-}
-</style>
 
 <script>
 function toggleEditForm(reviewID) {

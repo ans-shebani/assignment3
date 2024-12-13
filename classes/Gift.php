@@ -10,8 +10,9 @@ class Gift {
     }
 
     // إضافة هدية جديدة
-    public function addGiftTicket($senderID, $receiverID, $eventID) {
-        $query = "INSERT INTO gifttickets (senderID, receiverID, eventID) VALUES (?, ?, ?)";
+    public function addGiftTicket($senderID, $receiverID, $eventID, $ticketType) {
+        $query = "INSERT INTO gifttickets (senderID, receiverID, eventID, ticketType) 
+                  VALUES (?, ?, ?, ?)";
 
         $stmt = $this->conn->prepare($query);
 
@@ -19,6 +20,7 @@ class Gift {
             $stmt->bindParam(1, $senderID, PDO::PARAM_INT);
             $stmt->bindParam(2, $receiverID, PDO::PARAM_INT);
             $stmt->bindParam(3, $eventID, PDO::PARAM_INT);
+            $stmt->bindParam(4, $ticketType, PDO::PARAM_STR);
 
             if ($stmt->execute()) {
                 return [
@@ -162,49 +164,102 @@ public function receiveGift($giftID, $userID) {
 
 // دالة لإنشاء تذكرة من الهدية
 private function createTicketFromGift($giftID) {
+    $this->conn->beginTransaction();
+    
     try {
-        // جلب معلومات الهدية
-        $query = "SELECT * FROM gifttickets WHERE giftTicketID = :gift_id";
+        // Get gift information including ticketType
+        $query = "SELECT g.*, e.regularTicketPrice, e.vipTicketPrice, g.ticketType 
+                  FROM gifttickets g 
+                  JOIN events e ON g.eventID = e.eventID 
+                  WHERE g.giftTicketID = :gift_id";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':gift_id', $giftID, PDO::PARAM_INT);
         $stmt->execute();
-        $gift = $stmt->fetch(PDO::FETCH_ASSOC);
+        $giftData = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($gift) {
-            // جلب معلومات الحدث لمعرفة السعر
-            $query = "SELECT * FROM events WHERE eventID = :event_id";
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':event_id', $gift['eventID'], PDO::PARAM_INT);
-            $stmt->execute();
-            $event = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($event) {
-                // تحديد السعر بناءً على نوع التذكرة
-                $ticketPrice = ($gift['ticketType'] == 'VIP') ? $event['vipTicketPrice'] : $event['regularTicketPrice'];
-
-                // إنشاء التذكرة الجديدة
-                $query = "INSERT INTO tickets (eventID, userID, ticketType, status, price) 
-                          VALUES (:event_id, :user_id, :ticket_type, 'Confirmed', :price)";
-                $stmt = $this->conn->prepare($query);
-                $stmt->bindParam(':event_id', $gift['eventID'], PDO::PARAM_INT);
-                $stmt->bindParam(':user_id', $gift['receiverID'], PDO::PARAM_INT);
-                $stmt->bindParam(':ticket_type', $gift['ticketType'], PDO::PARAM_STR);
-                $stmt->bindParam(':price', $ticketPrice, PDO::PARAM_STR);  // استخدام السعر المناسب
-                
-                if ($stmt->execute()) {
-                    return true; // تم إضافة التذكرة بنجاح
-                } else {
-                    throw new Exception("لم يتم إضافة التذكرة.");
-                }
-            } else {
-                throw new Exception("الحدث غير موجود.");
-            }
-        } else {
-            throw new Exception("الهدية غير موجودة.");
+        if (!$giftData) {
+            throw new Exception("الهدية غير موجودة أو تم حذفها.");
         }
+
+        // Determine ticket price based on ticketType
+        $ticketPrice = ($giftData['ticketType'] === 'VIP') ? 
+            $giftData['vipTicketPrice'] : $giftData['regularTicketPrice'];
+
+        // Check seat availability
+        $query = "SELECT seatsAvailable FROM events WHERE eventID = :event_id FOR UPDATE";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':event_id', $giftData['eventID'], PDO::PARAM_INT);
+        $stmt->execute();
+        $eventSeats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($eventSeats['seatsAvailable'] <= 0) {
+            throw new Exception("عذراً، لا توجد مقاعد متاحة لهذا الحدث.");
+        }
+
+        // Create ticket
+        $query = "INSERT INTO tickets (eventID, userID, ticketType, status, price) 
+                  VALUES (:event_id, :user_id, :ticket_type, 'Confirmed', :price)";
+        $stmt = $this->conn->prepare($query);
+        $params = [
+            ':event_id' => $giftData['eventID'],
+            ':user_id' => $giftData['receiverID'],
+            ':ticket_type' => $giftData['ticketType'],
+            ':price' => $ticketPrice
+        ];
+        
+        if (!$stmt->execute($params)) {
+            throw new Exception("فشل في إنشاء التذكرة.");
+        }
+
+        // Update available seats
+        $query = "UPDATE events 
+                  SET seatsAvailable = seatsAvailable - 1 
+                  WHERE eventID = :event_id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':event_id', $giftData['eventID'], PDO::PARAM_INT);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("فشل في تحديث عدد المقاعد المتاحة.");
+        }
+
+        // Delete the gift
+        $query = "DELETE FROM gifttickets WHERE giftTicketID = :gift_id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':gift_id', $giftID, PDO::PARAM_INT);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("فشل في حذف الهدية.");
+        }
+
+        $this->conn->commit();
+        
+        // Create notification
+        $this->createNotification(
+            $giftData['receiverID'], 
+            "تم تحويل الهدية الخاصة بك إلى تذكرة بنجاح للحدث."
+        );
+
+        return true;
+
     } catch (Exception $e) {
-        // طباعة الخطأ للتصحيح
-        echo "حدث خطأ: " . $e->getMessage();
+        $this->conn->rollBack();
+        error_log("خطأ في createTicketFromGift: " . $e->getMessage());
+        throw new Exception("فشل في تحويل الهدية إلى تذكرة: " . $e->getMessage());
+    }
+}
+
+// دالة مساعدة لإنشاء الإشعارات
+private function createNotification($userID, $message) {
+    try {
+        $query = "INSERT INTO notifications (userID, message) VALUES (:user_id, :message)";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([
+            ':user_id' => $userID,
+            ':message' => $message
+        ]);
+        return true;
+    } catch (Exception $e) {
+        error_log("خطأ في إنشاء الإشعار: " . $e->getMessage());
         return false;
     }
 }

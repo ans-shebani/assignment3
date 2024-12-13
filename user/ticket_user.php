@@ -2,7 +2,6 @@
 session_start();
 include_once '../conn/conn.php';
 
-// التحقق من تسجيل الدخول
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../auth/login.php");
     exit();
@@ -16,48 +15,52 @@ $userID = $_SESSION['user_id'];
 // معالجة طلب إلغاء التذكرة
 if (isset($_POST['cancel_ticket']) && isset($_POST['ticketID']) && isset($_POST['eventID'])) {
     try {
-        // بدء المعاملة
         $db->beginTransaction();
         
-        // تحديث حالة التذكرة
         $updateTicketQuery = "UPDATE Tickets SET status = 'Cancelled' 
                             WHERE ticketID = ? AND userID = ?";
         $stmt = $db->prepare($updateTicketQuery);
         $stmt->execute([$_POST['ticketID'], $userID]);
         
-        // زيادة عدد المقاعد المتاحة
         $updateSeatsQuery = "UPDATE Events SET seatsAvailable = seatsAvailable + 1 
                             WHERE eventID = ?";
         $stmt = $db->prepare($updateSeatsQuery);
         $stmt->execute([$_POST['eventID']]);
         
-        // تأكيد المعاملة
         $db->commit();
         
-        // إعادة توجيه بعد نجاح العملية
         header("Location: ticket_user.php?message=success");
         exit();
     } catch (Exception $e) {
-        // التراجع عن المعاملة في حالة حدوث خطأ
         $db->rollBack();
         header("Location: ticket_user.php?message=error");
         exit();
     }
 }
 
-// جلب جميع تذاكر المستخدم مع معلومات الأحداث والمدفوعات
 $query = "SELECT t.*, e.name as eventName, e.date as eventDate, e.location, 
-                 p.paymentMethod, p.amount, u.name as userName, u.email 
-          FROM Tickets t 
-          JOIN Events e ON t.eventID = e.eventID 
-          JOIN Payments p ON t.paymentID = p.paymentID 
-          JOIN Users u ON t.userID = u.userID 
-          WHERE t.userID = ? 
-          ORDER BY e.date DESC";
+p.paymentMethod, p.amount, 
+buyer.name as buyerName, buyer.email as buyerEmail,
+gt.senderID, gt.receiverID,
+sender.name as senderName, sender.email as senderEmail,
+receiver.name as receiverName, receiver.email as receiverEmail
+FROM Tickets t 
+JOIN Events e ON t.eventID = e.eventID 
+JOIN Payments p ON t.paymentID = p.paymentID 
+JOIN Users buyer ON t.userID = buyer.userID 
+LEFT JOIN gifttickets gt ON t.ticketID = gt.giftTicketID
+LEFT JOIN Users sender ON gt.senderID = sender.userID
+LEFT JOIN Users receiver ON gt.receiverID = receiver.userID
+WHERE t.userID = ? 
+ORDER BY e.date DESC";
+
+
 
 $stmt = $db->prepare($query);
-$stmt->execute([$userID]);
+$stmt->execute([$userID]);  
 $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
 ?>
 
 <!DOCTYPE html>
@@ -70,7 +73,7 @@ $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </head>
 <body>
     <nav>
-    <ul>
+        <ul>
             <li><a href="../public/main.php">الرئيسية</a></li>
             <li><a href="../admin/admin_dashboard.php">المسؤول</a></li>
             <li><a href="event_user.php">الفعاليات</a></li>
@@ -93,64 +96,76 @@ $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php endif; ?>
 
     <div class="tickets-container">
-        <?php if (count($tickets) > 0): ?>
-            <?php foreach ($tickets as $ticket): ?>
-                <div class="ticket-card">
-                    <div class="ticket-header">
-                        <h3 class="ticket-title"><?php echo htmlspecialchars($ticket['eventName']); ?></h3>
-                        <span class="ticket-status status-<?php echo strtolower($ticket['status']); ?>">
-                            <?php 
-                            $statusArabic = [
-                                'Confirmed' => 'مؤكد',
-                                'Pending' => 'قيد الانتظار',
-                                'Cancelled' => 'ملغي'
-                            ];
-                            echo $statusArabic[$ticket['status']];
-                            ?>
-                        </span>
-                    </div>
-                    
-                    <div class="ticket-details">
-                        <p class="ticket-detail">
-                            <strong>التاريخ:</strong> 
-                            <?php echo date('Y-m-d H:i', strtotime($ticket['eventDate'])); ?>
-                        </p>
-                        <p class="ticket-detail">
-                            <strong>المكان:</strong> 
-                            <?php echo htmlspecialchars($ticket['location']); ?>
-                        </p>
-                        <p class="ticket-detail">
-                            <strong>نوع التذكرة:</strong>
-                            <span class="ticket-type type-<?php echo strtolower($ticket['ticketType']); ?>">
-                                <?php echo $ticket['ticketType'] == 'Regular' ? 'عادية' : 'VIP'; ?>
-                            </span>
-                        </p>
-                        <p class="ticket-detail">
-                            <strong>طريقة الدفع:</strong>
-                            <?php echo htmlspecialchars($ticket['paymentMethod']); ?>
-                        </p>
-                        <p class="ticket-price">
-                            <strong>السعر:</strong>
-                            <?php echo number_format($ticket['amount'], 2); ?> دينار
-                        </p>
-                        
-                        <?php if ($ticket['status'] !== 'Cancelled'): ?>
-                            <div class="ticket-actions">
-                                <form method="POST" onsubmit="return confirm('هل أنت متأكد من رغبتك في إلغاء هذه التذكرة؟');">
-                                    <input type="hidden" name="ticketID" value="<?php echo $ticket['ticketID']; ?>">
-                                    <input type="hidden" name="eventID" value="<?php echo $ticket['eventID']; ?>">
-                                    <button type="submit" name="cancel_ticket" class="cancel-btn">إلغاء التذكرة</button>
-                                </form>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+    <?php if (count($tickets) > 0): ?>
+        <?php foreach ($tickets as $ticket): ?>
+            <div class="ticket-card <?php echo $ticket['senderID'] ? 'gift-ticket' : ''; ?>">
+                <div class="ticket-header">
+                    <h3 class="ticket-title"><?php echo htmlspecialchars($ticket['eventName']); ?></h3>
+                    <span class="ticket-status status-<?php echo strtolower($ticket['status']); ?>">
+                        <?php 
+                        $statusArabic = [
+                            'Confirmed' => 'مؤكد',
+                            'Pending' => 'قيد الانتظار',
+                            'Cancelled' => 'ملغي'
+                        ];
+                        echo $statusArabic[$ticket['status']];
+                        ?>
+                    </span>
                 </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="no-tickets">
-                <p>لا توجد تذاكر محجوزة حالياً</p>
+                
+                <div class="ticket-details">
+                    <!-- عرض تذاكر مهداة إذا كانت تذكرة مهداة -->
+                    <?php if ($ticket['senderID']): ?>
+                        <div class="gift-info">
+                            <?php if ($ticket['receiverID'] == $userID): ?>
+                                <p class="gift-detail"><strong>مهداة من:</strong> <?php echo htmlspecialchars($ticket['senderName']); ?></p>
+                            <?php else: ?>
+                                <p class="gift-detail"><strong>مهداة إلى:</strong> <?php echo htmlspecialchars($ticket['receiverName']); ?></p>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <p class="ticket-detail">
+                        <strong>التاريخ:</strong> 
+                        <?php echo date('Y-m-d H:i', strtotime($ticket['eventDate'])); ?>
+                    </p>
+                    <p class="ticket-detail">
+                        <strong>المكان:</strong> 
+                        <?php echo htmlspecialchars($ticket['location']); ?>
+                    </p>
+                    <p class="ticket-detail">
+                        <strong>نوع التذكرة:</strong>
+                        <span class="ticket-type type-<?php echo strtolower($ticket['ticketType']); ?>">
+                            <?php echo $ticket['ticketType'] == 'Regular' ? 'عادية' : 'VIP'; ?>
+                        </span>
+                    </p>
+                    <p class="ticket-detail">
+                        <strong>طريقة الدفع:</strong>
+                        <?php echo htmlspecialchars($ticket['paymentMethod']); ?>
+                    </p>
+                    <p class="ticket-price">
+                        <strong>السعر:</strong>
+                        <?php echo number_format($ticket['amount'], 2); ?> دينار
+                    </p>
+                    
+                    <?php if ($ticket['status'] !== 'Cancelled'): ?>
+                        <div class="ticket-actions">
+                            <form method="POST" onsubmit="return confirm('هل أنت متأكد من رغبتك في إلغاء هذه التذكرة؟');">
+                                <input type="hidden" name="ticketID" value="<?php echo $ticket['ticketID']; ?>">
+                                <input type="hidden" name="eventID" value="<?php echo $ticket['eventID']; ?>">
+                                <button type="submit" name="cancel_ticket" class="cancel-btn">إلغاء التذكرة</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
-        <?php endif; ?>
-    </div>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <div class="no-tickets">
+            <p>لا توجد تذاكر محجوزة حالياً</p>
+        </div>
+    <?php endif; ?>
+</div>
+
 </body>
 </html>

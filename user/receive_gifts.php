@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($updateStatus) {
         // رسالة نجاح
         $_SESSION['success_message'] = "تم استلام الهدية بنجاح وإضافتها إلى تذاكرك";
-        header("Location: ../user/ticket_user.php");
+        header("Location: ticket_user.php");
         exit();
     } else {
         $error_message = "حدث خطأ أثناء استلام الهدية.";

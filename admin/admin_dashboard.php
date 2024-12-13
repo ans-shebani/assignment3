@@ -201,6 +201,7 @@ $totalEvents = count($events);
             <h1>لوحة تحكم المسؤول</h1>
             <ul>
                 <li><a href="admin_dashboard.php">لوحة التحكم</a></li>
+                <li><a href="../public/main.php">صفحة المستخدم</a></li>
                 <li><a href="manager_event.php">إدارة الفعاليات</a></li>
                 <li><a href="#users">إدارة المستخدمين</a></li>
                 <li><a href="admin_notifications.php">الإشعارات</a></li>

@@ -97,7 +97,8 @@ $events = $conn->query($query);
             $validation = $gift->validateGift($eventID, $receiverID);
             
             if ($validation['status']) {
-                $result = $gift->addGiftTicket($userID, $receiverID, $eventID);
+                // Corrected line:
+                $result = $gift->addGiftTicket($userID, $receiverID, $eventID, 'Regular'); 
                 if ($result['status']) {
                     echo '<div class="message success">' . $result['message'] . '</div>';
                 } else {
