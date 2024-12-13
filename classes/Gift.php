@@ -69,32 +69,6 @@ class Gift {
         ];
     }
 
-    // الحصول على الهدايا المرسلة من مستخدم معين
-    public function getSentGifts($senderID) {
-        $query = "SELECT g.*, e.name AS eventName, e.date AS eventDate, u.name AS receiverName 
-                  FROM gifttickets g 
-                  LEFT JOIN events e ON g.eventID = e.eventID 
-                  LEFT JOIN users u ON g.receiverID = u.userID 
-                  WHERE g.senderID = :senderID";
-
-        $stmt = $this->conn->prepare($query);
-
-        if ($stmt) {
-            $stmt->bindParam(':senderID', $senderID, PDO::PARAM_INT);
-            $stmt->execute();
-            $gifts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            return [
-                'status' => true,
-                'gifts' => $gifts
-            ];
-        }
-
-        return [
-            'status' => false,
-            'message' => 'حدث خطأ في استرجاع الهدايا المرسلة'
-        ];
-    }
 
     // التحقق من صلاحية الهدية
     public function validateGift($eventID, $receiverID) {
@@ -248,7 +222,7 @@ private function createTicketFromGift($giftID) {
     }
 }
 
-// دالة مساعدة لإنشاء الإشعارات
+// دالة  لإنشاء الإشعارات
 private function createNotification($userID, $message) {
     try {
         $query = "INSERT INTO notifications (userID, message) VALUES (:user_id, :message)";
