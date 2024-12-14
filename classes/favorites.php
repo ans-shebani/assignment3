@@ -1,24 +1,54 @@
 <?php
-//include "../conn/conn.php";
-class Favorites {
+class FavoritesRepository {
     private $pdo;
-    private $userID;
-    public $favoriteEvents = []; 
 
-    public function __construct($pdo, $userID) {
+    public function __construct($pdo) {
         $this->pdo = $pdo;
+    }
+
+    // إضافة فعالية إلى المفضلة
+    public function addFavorite($userID, $eventID) {
+        $query = "INSERT INTO Favorites (userID, eventID) VALUES (:userID, :eventID)";
+        $stmt = $this->pdo->prepare($query);
+        $stmt->bindParam(':userID', $userID);
+        $stmt->bindParam(':eventID', $eventID);
+        return $stmt->execute();
+    }
+
+    // إزالة فعالية من المفضلة
+    public function removeFavorite($userID, $eventID) {
+        $query = "DELETE FROM Favorites WHERE userID = :userID AND eventID = :eventID";
+        $stmt = $this->pdo->prepare($query);
+        $stmt->bindParam(':userID', $userID);
+        $stmt->bindParam(':eventID', $eventID);
+        return $stmt->execute();
+    }
+
+    // جلب قائمة الفعاليات المفضلة
+    public function getFavorites($userID) {
+        $query = "SELECT * FROM Events WHERE eventID IN (SELECT eventID FROM Favorites WHERE userID = :userID)";
+        $stmt = $this->pdo->prepare($query);
+        $stmt->bindParam(':userID', $userID);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+class Favorites {
+    private $repository;
+    private $userID;
+    public $favoriteEvents = [];
+
+    public function __construct(FavoritesRepository $repository, $userID) {
+        $this->repository = $repository;
         $this->userID = $userID;
         $this->loadFavorites();
     }
 
     // إضافة فعالية إلى المفضلة
     public function addFavorite($eventID) {
-        $query = "INSERT INTO Favorites (userID, eventID) VALUES (:userID, :eventID)";
-        $stmt = $this->pdo->prepare($query);
-        $stmt->bindParam(':userID', $this->userID);
-        $stmt->bindParam(':eventID', $eventID);
-        if ($stmt->execute()) {
-            $this->loadFavorites(); 
+        if ($this->repository->addFavorite($this->userID, $eventID)) {
+            $this->loadFavorites(); // تحديث القائمة
             return true;
         }
         return false;
@@ -26,20 +56,16 @@ class Favorites {
 
     // إزالة فعالية من المفضلة
     public function removeFavorite($eventID) {
-        $query = "DELETE FROM Favorites WHERE userID = :userID AND eventID = :eventID";
-        $stmt = $this->pdo->prepare($query);
-        $stmt->bindParam(':userID', $this->userID);
-        $stmt->bindParam(':eventID', $eventID);
-        return $stmt->execute();
+        if ($this->repository->removeFavorite($this->userID, $eventID)) {
+            $this->loadFavorites(); // تحديث القائمة
+            return true;
+        }
+        return false;
     }
 
-    // تحميل الفعاليات المفضلة للمستخدم من قاعدة البيانات
+    // تحميل الفعاليات المفضلة للمستخدم
     private function loadFavorites() {
-        $query = "SELECT * FROM Events WHERE eventID IN (SELECT eventID FROM Favorites WHERE userID = :userID)";
-        $stmt = $this->pdo->prepare($query);
-        $stmt->bindParam(':userID', $this->userID);
-        $stmt->execute();
-        $this->favoriteEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $this->favoriteEvents = $this->repository->getFavorites($this->userID);
     }
 
     // عرض الفعاليات المفضلة للمستخدم

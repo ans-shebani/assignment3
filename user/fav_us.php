@@ -1,6 +1,6 @@
 <?php
 include "../classes/favorites.php";
- include "../conn/conn.php";
+include "../conn/conn.php";
 session_start();
 
 // التأكد من وجود المستخدم في الجلسة
@@ -12,10 +12,13 @@ if (!isset($_SESSION['user_id'])) {
 // الحصول على ID المستخدم من الجلسة
 $userID = $_SESSION['user_id'];
 
-// إنشاء كائن من الكلاس Favorites
+// إنشاء كائن من الكلاس FavoritesRepository
 $conn = new Database();
 $pdo = $conn->getConnection();
-$favorites = new Favorites($pdo, $userID);
+$favoritesRepository = new FavoritesRepository($pdo);
+
+// إنشاء كائن من الكلاس Favorites
+$favorites = new Favorites($favoritesRepository, $userID);
 
 // التعامل مع الحذف إذا تم إرسال بيانات عبر POST
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['removeFavorite'])) {
@@ -32,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['removeFavorite'])) {
     $favorites->displayFavorites();
 }
 ?>
+
 
 <!-- إضافة تنسيقات CSS مباشرة داخل الصفحة -->
 <style>

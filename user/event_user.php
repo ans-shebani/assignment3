@@ -365,23 +365,25 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
 // التحقق من أن المستخدم قد سجل دخوله
 if (isset($_SESSION['user_id'])) {
     $userID = $_SESSION['user_id'];
-    $favorite = new Favorites($db, $userID); // إنشاء كائن من الكلاس
+    $favoritesRepository = new FavoritesRepository($db);
 
+    // إنشاء كائن من الكلاس Favorites
+    $favorites = new Favorites($favoritesRepository, $userID);
     // معالجة إضافة الفعالية إلى المفضلة
     if (isset($_POST['addFavorite'])) {
         $eventID = $_POST['eventID'];
-        $favorite->addFavorite($eventID);
+        $favorites->addFavorite($eventID);
     }
 
     // معالجة إزالة الفعالية من المفضلة
     if (isset($_POST['removeFavorite'])) {
         $eventID = $_POST['eventID'];
-        $favorite->removeFavorite($eventID);
+        $favorites->removeFavorite($eventID);
     }
 
-    // التحقق إذا كان الحدث موجود في المفضلة
+    // التحقق إذا كان الحدث موجودًا في المفضلة
     $isFavorite = false;
-    foreach ($favorite->favoriteEvents as $favoriteEvent) {
+    foreach ($favorites->favoriteEvents as $favoriteEvent) { // تعديل هنا
         if ($favoriteEvent['eventID'] == $row['eventID']) {
             $isFavorite = true;
             break;
@@ -400,12 +402,9 @@ if (isset($_SESSION['user_id'])) {
                 <button type='submit' name='addFavorite' class='btn-add'>إضافة إلى المفضلة</button>
               </form>";
     }
-
-  
 } else {
     echo "يرجى تسجيل الدخول أولاً.";
 }
-
 
     $review = new Review($db);
     // جلب المراجعات الخاصة بالحدث

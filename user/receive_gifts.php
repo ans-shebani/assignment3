@@ -14,7 +14,8 @@ $userID = $_SESSION['user_id'] ?? 0; // التأكد من تسجيل دخول ا
 // جلب الهدايا
 $giftsResult = $gift->getGiftsNotReceived($userID);
 $receivedGifts = ($giftsResult['status']) ? $giftsResult['gifts'] : []; // استدعاء دالة لجلب الهدايا غير المستلمة
-
+$notificationObserver = new NotificationObserverImplementation($conn, $userID);
+$gift->addObserver($notificationObserver);  // إضافة المراقب
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $giftID = $_POST['gift_id']; 
     
